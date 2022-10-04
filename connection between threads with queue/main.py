@@ -22,7 +22,8 @@ def main() -> None:
 
     # creating the taskers
     for i in range(1, NUM_OF_TASKERS + 1):
-        new_tasker = Tasker(name=f"Tasker {i}", task_queue=task_queue, number_of_tasks=NUM_OF_TASKS, number_of_iterations=NUM_OF_ITERATIONS)
+        new_tasker = Tasker(name=f"Tasker {i}", task_queue=task_queue,
+                            number_of_tasks=NUM_OF_TASKS, number_of_iterations=NUM_OF_ITERATIONS)
         taskers.append(new_tasker)
 
     # starting the threads
