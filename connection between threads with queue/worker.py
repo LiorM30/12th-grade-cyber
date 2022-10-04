@@ -11,6 +11,7 @@ class Worker(Thread):
         self.name = name
         self.task_queue = task_queue
 
+
     def run(self) -> None:
         while True:
             current_task = self.task_queue.get()
@@ -20,7 +21,8 @@ class Worker(Thread):
                 self.task_queue.put(current_task)
                 break
 
-            print(f"[{self.name}] starting task: {current_task.name}")
+            print(f"[{self.name}] starting task: {current_task.name} from {current_task.source}")
             current_task.action()
 
         print(f"[{self.name} done]")
+
