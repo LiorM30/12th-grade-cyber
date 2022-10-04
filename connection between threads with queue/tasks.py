@@ -6,5 +6,6 @@ from typing import Callable
 class Task:
     name: str
     action: Callable
+    source: str
 
-end_task = Task("stop working", lambda:True)
+end_task = Task("Stop Working", lambda:True, "Main Thread")

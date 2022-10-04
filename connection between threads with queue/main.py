@@ -1,49 +1,41 @@
 from queue import Queue
-from threading import Thread
-from time import sleep
 
 from worker import Worker
-from tasks import Task, end_task
+from tasker import Tasker
+from tasks import end_task
 
-NUM_OF_WORKERS = 4
+NUM_OF_TASKERS = 1
+NUM_OF_WORKERS = 10
 NUM_OF_TASKS = 10
-NUM_OF_ITERATIONS = 2
-
-
-def default_task_action() -> None:
-    sleep(2)
-
-
-def tasking(task_queue: Queue) -> None:
-    for iteration in range(1, NUM_OF_ITERATIONS + 1):
-        print(f"on iteration {iteration}")
-        for task in range(1, NUM_OF_TASKS + 1):
-            new_task = Task(f"{iteration}.{task} def", default_task_action)
-            task_queue.put(new_task)
-        print("sleeping to next iteration")
-        sleep(5)
-    print("done putting tasks")
-    task_queue.put(end_task)
+NUM_OF_ITERATIONS = 1
 
 
 def main() -> None:
     task_queue = Queue()
     workers = []
+    taskers = []
 
     # creating workers
     for i in range(1, NUM_OF_WORKERS + 1):
         new_worker = Worker(name=f"Worker {i}", task_queue=task_queue)
         workers.append(new_worker)
 
-    # initializing the tasker
-    tasker = Thread(name="Tasker", target=tasking, args=(task_queue,))
+    # creating the taskers
+    for i in range(1, NUM_OF_TASKERS + 1):
+        new_tasker = Tasker(name=f"Tasker {i}", task_queue=task_queue, number_of_tasks=NUM_OF_TASKS, number_of_iterations=NUM_OF_ITERATIONS)
+        taskers.append(new_tasker)
 
     # starting the threads
-    tasker.start()
+    for tasker in taskers:
+        tasker.start()
     for worker in workers:
         worker.start()
 
-    tasker.join()
+    # waiting for the taskers to end and then telling the workers to stop too
+    for tasker in taskers:
+        tasker.join()
+    task_queue.put(end_task)
+
     for worker in workers:
         worker.join()
 
