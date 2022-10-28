@@ -2,7 +2,6 @@ from threading import Thread
 from queue import Queue
 from time import sleep
 import logging
-from sys import stdout
 
 
 from tasks import Task
