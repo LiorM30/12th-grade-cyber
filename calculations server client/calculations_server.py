@@ -1,3 +1,5 @@
+from asyncio import tasks
+from dataclasses import dataclass
 import socket
 import json
 import logging
@@ -8,16 +10,12 @@ from calculations_protocol import Task
 
 
 class Calculations_Server:
-    def __init__(self, ip: str, port: int, tasks_path: str,
-                 max_clients: int) -> None:
+    def __init__(self, ip: str, port: int, tasks_path: str) -> None:
         self.ip = ip
         self.port = port
         self.tasks_path = tasks_path
-        self.max_clients = max_clients
 
-        self.clients: List[socket.socket] = []
         self.tasks: List[Task] = []
-        self.lookup: Dict[str, List[socket.socket]] = {}
 
         self._parse_tasks()
 
@@ -36,17 +34,27 @@ class Calculations_Server:
                                        parameter=par_line[1]))
 
     def run(self) -> None:
-        listener_thread = Thread(target=self._listen_continously, args=())
-        listener_thread.start()
+        # listener_thread = Thread(target=self._listen_continously, args=())
+        # listener_thread.start()
 
-        
+        while True:
+            if len(self.tasks) > 0:
+                self.sock.listen()
+                new_cli, addr = self.sock.accept()
+                connection_msg: Dict = json.loads(new_cli.recv(1024).decode())
+
+                for task in self.tasks:
+                    pass
+                    
+
     def _listen_continously(self) -> None:
         self.sock.listen()
 
         while True:
             new_cli, addr = self.sock.accept()
             self.clients.append(new_cli)
-            msg: Dict = json.loads(new_cli.recv(1024).decode())
+            connection_msg: Dict = json.loads(new_cli.recv(1024).decode())
 
-            for number in msg['numbers']:
-                self.lookup[number].append(new_cli)
+    def _handle_client(client: socket.socket) -> None:
+        for task in tasks:
+            pass
