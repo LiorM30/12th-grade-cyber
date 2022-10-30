@@ -5,18 +5,35 @@ import struct
 from threading import Thread
 from sys import stdout
 from typing import List
+from time import sleep
 
 from calculations_server import Calculations_Server
 from calculations_client import Calculations_Client
 
 
 def run_client():
-    client = Calculations_Client()
+    client = Calculations_Client("127.0.0.1", 16666)
+    print("test")
+    client.add_calculation(
+        "1", lambda x: sleep(1)
+    )
+    client.add_calculation(
+        "2", lambda x: sleep(1)
+    )
+    client.add_calculation(
+        "3", lambda x: sleep(1)
+    )
+    client.add_calculation(
+        "4", lambda x: sleep(1)
+    )
+    client.add_calculation(
+        "5", lambda x: sleep(1)
+    )
     client.run()
 
 
 def run_server():
-    server = Calculations_Server()
+    server = Calculations_Server("127.0.0.1", 16666, "calculations server client\\tasks.txt")
     server.run()
 
 
@@ -34,16 +51,6 @@ def main():
         help='the location of the tasks file'
     )
 
-    parser.add_argument(
-        '--answers-path', '-ap', action='store', type=str, default="answers.txt",  # noqa
-        help='the location of the answers file'
-    )
-
-    parser.add_argument(
-        '--local', '-l', action='store_true', type=bool,
-        help='whether to run the clients locally'
-    )
-
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -57,32 +64,30 @@ def main():
 
     logger = logging.getLogger('root')
 
-    if args.local:
-        server_thread = Thread(targert=run_server, args=())
-        server_thread.start()
-        logger.debug("server created and running")
+    server_thread = Thread(target=run_server, args=())
+    server_thread.start()
+    logger.debug("server created and running")
 
-        clients: List[Thread] = []
-        for _ in range(3):
-            clients.append(Thread(target=run_client, args=()))
+    sleep(2)
+    clients: List[Thread] = []
+    for _ in range(3):
+        clients.append(Thread(target=run_client, args=()))
 
-        for client in clients:
-            client.start()
-            logger.debug("all clients are running")
+    for client in clients:
+        client.start()
+        logger.debug("all clients are running")
 
-        for client in clients:
-            client.join()
+    for client in clients:
+        client.join()
 
-        server_thread.join()
-
-    else:
-        run_server()
+    server_thread.join()
 
     logger.debug("program ended")
 
 
 if __name__ == "__main__":
     main()
+    # TODO fix structure to add the task IDs
     # with open("calculations server client\known_operators.json") as op:
     #     print(json.load(op))
     # a = [1, 2, 3, 4, 5, 6]
