@@ -93,7 +93,7 @@ def main():
     logging.getLogger('root').addHandler(logging.StreamHandler(stdout))
     logging.getLogger('root').addHandler(logging.FileHandler('exercise_log.log'))  # noqa
 
-    client = Calculations_Client("127.0.0.1", 3333)
+    client = Calculations_Client("127.0.0.1", 16166)
     client.add_calculation(
         "1", lambda x: sleep(1)
     )

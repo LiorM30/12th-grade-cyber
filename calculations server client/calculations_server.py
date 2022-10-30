@@ -8,6 +8,7 @@ from typing import Dict, Tuple, List
 import datetime
 from sys import stdout
 import argparse
+import os
 
 from calculations_protocol import Task, Packet_Headers
 
@@ -32,7 +33,9 @@ class Calculations_Server:
 
         self.client_cache: Dict[str, List[str]] = {}
 
-        with open("known_operators.json") as op:
+        file_dir = os.path.dirname(__file__)
+        file_path = os.path.join(file_dir, ".\\known_operators.json")
+        with open(file_path) as op:
             self.operators: Dict[str, Dict[str, int]] = json.load(op)
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -64,7 +67,8 @@ class Calculations_Server:
 
     def run(self) -> None:
         while not all(len(tasks) == 0 for tasks in self.tasks_table):
-            self.sock.listen(5)
+            self.sock.listen(1)
+            self.logger.debug("listening")
             new_cli, addr = self.sock.accept()
             self.logger.debug("new client")
             handler = Thread(target=self._handle_client, args=(new_cli,))
@@ -186,7 +190,7 @@ def main():
     logging.getLogger('root').addHandler(logging.StreamHandler(stdout))
     logging.getLogger('root').addHandler(logging.FileHandler('exercise_log.log'))  # noqa
 
-    server = Calculations_Server("127.0.0.1", 3333,
+    server = Calculations_Server("127.0.0.1", 16166,
                                  "C:\\Users\\User\\Desktop\\cyber\\12th-grade-cyber\\calculations server client\\tasks.txt"
     )
     server.run()
