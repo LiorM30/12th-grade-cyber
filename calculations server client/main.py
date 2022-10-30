@@ -1,9 +1,6 @@
 import argparse
-import json
 import logging
-import struct
 from threading import Thread
-from sys import stdout
 from typing import List
 from time import sleep
 
@@ -59,7 +56,6 @@ def main():
         datefmt='%d-%m-%Y %H:%M:%S',
     )
 
-    logging.getLogger('root').addHandler(logging.StreamHandler(stdout))
     logging.getLogger('root').addHandler(logging.FileHandler('exercise_log.log'))  # noqa
 
     logger = logging.getLogger('root')

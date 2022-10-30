@@ -4,7 +4,6 @@ import logging
 from typing import Callable
 from time import sleep
 import argparse
-from sys import stdout
 
 from calculations_protocol import Packet_Headers
 
@@ -23,43 +22,50 @@ class Calculations_Client:
     def run(self):
         continue_running = True
 
+        self.sock.connect((self.server_ip, self.server_port))
+        self.logger.debug("connected to server")
+
+        self.sock.send(json.dumps(
+            {
+                'header': Packet_Headers.INIT.value,
+                'operators': list(self.calculations.keys())
+            }
+        ).encode())
+        self.logger.debug("sent INIT packet")
+
         while continue_running:
-            self.sock.connect((self.server_ip, self.server_port))
-            self.sock.send(json.dumps(
-                {
-                    'header': Packet_Headers.INIT,
-                    'operators': self.calculations.keys()
-                }
-            ).encode())
-            self.logger.debug("sent INIT packet")
+
             packet = json.loads(self.sock.recv(1024).decode())
             header = packet['header']
 
-            while header == Packet_Headers.TASK:
+            if header == Packet_Headers.TASK.value:
                 self.logger.debug("recieved TASK packet")
                 id = packet['id']
                 operator = packet['operator']
                 parameter = packet['parameter']
 
+                self.sock.close()
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+                self.logger.debug(f"starting to calculate: {operator}")
                 answer = self.calculations[operator](parameter)
-                self.logger.debug("finished calculating")
+                self.logger.debug(f"finished calculating: {operator}")
 
                 answer_pack = {
-                    'header': Packet_Headers.ANS,
-                    'id': id,
+                    'header': Packet_Headers.ANS.value,
+                    'task id': id,
+                    'operator': operator,
                     'answer': answer
                 }
 
                 self.sock.connect((self.server_ip, self.server_port))
+                self.logger.debug("connected to server")
                 self.sock.send(json.dumps(answer_pack).encode())
-                self.logger.debug("sent ans packet")
+                self.logger.debug("sent ANS packet")
 
-                packet = json.loads(self.sock.recv(1024).decode())
-                header = packet['header']
-
-            if header == Packet_Headers.END:
+            elif header == Packet_Headers.END.value:
                 self.logger.debug("got END packet")
-                pass
+                continue_running = False
 
     def add_calculation(self,
                         operator: str, calculation: Callable[[int], int]
@@ -90,7 +96,6 @@ def main():
         datefmt='%d-%m-%Y %H:%M:%S',
     )
 
-    logging.getLogger('root').addHandler(logging.StreamHandler(stdout))
     logging.getLogger('root').addHandler(logging.FileHandler('exercise_log.log'))  # noqa
 
     client = Calculations_Client("127.0.0.1", 16166)
