@@ -83,6 +83,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # with open("calculations server client\known_operators.json") as op:
+    #     print(json.load(op))
     # a = [1, 2, 3, 4, 5, 6]
     # p = struct.pack('!i', a)
     # print(struct.unpack('!i', p))

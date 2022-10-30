@@ -1,12 +1,11 @@
-from asyncio import tasks
 from dataclasses import dataclass
 import socket
 import json
 import logging
 from threading import Thread
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
-from calculations_protocol import Task
+from calculations_protocol import Task, Packet_Type
 
 
 class Calculations_Server:
@@ -15,9 +14,18 @@ class Calculations_Server:
         self.port = port
         self.tasks_path = tasks_path
 
-        self.tasks: List[Task] = []
-
+        # {
+        #   operator: {
+        #       ID: task,
+        #       ...
+        #       },
+        #   ...
+        # }
+        self.tasks_table: Dict[str, Dict[int, Task]] = {}
         self._parse_tasks()
+
+        with open("calculations server client\\known_operators.json") as op:
+            self.operators: Dict[str, Dict[str, int]] = json.load(op)
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.bind(
@@ -28,33 +36,49 @@ class Calculations_Server:
 
     def _parse_tasks(self) -> None:
         with open(self.tasks_path, 'r') as tasks_file:
+            task_id = 0
             for line in tasks_file:
                 par_line = line.split()
-                self.tasks.append(Task(number=par_line[0],
-                                       parameter=par_line[1]))
+                operator = par_line[0]
+                parameter = par_line[1]
+
+                self.tasks_table[operator][task_id] = Task(
+                    operator=operator, parameter=parameter
+                )
+
+                task_id += 1
 
     def run(self) -> None:
-        # listener_thread = Thread(target=self._listen_continously, args=())
-        # listener_thread.start()
-
-        while True:
-            if len(self.tasks) > 0:
-                self.sock.listen()
-                new_cli, addr = self.sock.accept()
-                connection_msg: Dict = json.loads(new_cli.recv(1024).decode())
-
-                for task in self.tasks:
-                    pass
-                    
-
-    def _listen_continously(self) -> None:
-        self.sock.listen()
-
-        while True:
+        while not all(len(tasks) == 0 for tasks in self.tasks_table):
+            self.sock.listen()
             new_cli, addr = self.sock.accept()
-            self.clients.append(new_cli)
-            connection_msg: Dict = json.loads(new_cli.recv(1024).decode())
+            handler = Thread(target=self._handle_client, args=(new_cli,))
+            handler.start()
 
-    def _handle_client(client: socket.socket) -> None:
-        for task in tasks:
-            pass
+    def _possible_task(self, possible: Dict[int, str]) -> Task:
+        pass
+
+    def _handle_client(self, client: socket.socket) -> None:
+        connection_msg: Dict[str, int] = json.loads(client.recv(1024).decode())
+
+        match connection_msg['header']:
+            case Packet_Type.INIT:
+                if any(connection_msg['operators'] in operators
+                       for operators in self.tasks_table.keys()):
+                    task: Task = self._possible_task()
+                    packet = {
+                        'header': Packet_Type.TASK,
+                        'operator': task.operator,
+                        'parameter': task.parameter
+                    }
+
+                    self.tasks_table
+                else:
+                    packet = {
+                        'header': Packet_Type.END
+                    }
+            case Packet_Type.ANS:
+                pass
+
+        client.send(json.dumps(packet).encode())
+        client.close()
