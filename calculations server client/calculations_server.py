@@ -1,11 +1,9 @@
-from ast import operator
 import socket
 import json
 import logging
 from threading import Thread
 from typing import Dict, Tuple, List
 import datetime
-from sys import stdout
 import argparse
 import os
 
@@ -39,13 +37,13 @@ class Calculations_Server:
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.bind(
-            (socket.gethostbyname(socket.gethostname()), port)
+            (self.ip, port)
         )
 
         self.answers = []
 
     def _parse_tasks(self) -> None:
-        with open(self.tasks_path, 'r') as tasks_file:
+        with open(os.path.join(os.path.dirname(__file__), self.tasks_path), 'r') as tasks_file:
             task_id = 0
             for line in tasks_file:
                 par_line = line.split()
@@ -54,18 +52,22 @@ class Calculations_Server:
 
                 if operator in self.tasks_table:
                     self.tasks_table[operator][task_id] = Task(
-                        operator=operator, parameter=parameter, time_of_hold=None
+                        operator=operator
+                        parameter=parameter,
+                        time_of_hold=None
                     )
                 else:
                     self.tasks_table[operator] = {}
                     self.tasks_table[operator][task_id] = Task(
-                        operator=operator, parameter=parameter, time_of_hold=None
+                        operator=operator,
+                        parameter=parameter,
+                        time_of_hold=None
                     )
 
                 task_id += 1
 
     def run(self) -> None:
-        while not all(len(tasks) == 0 for tasks in self.tasks_table):
+        while not all(len(tasks) == 0 for operators, tasks in self.tasks_table.items()):
             self.sock.listen(1)
             self.logger.debug("listening")
             new_cli, addr = self.sock.accept()
@@ -76,21 +78,23 @@ class Calculations_Server:
         self.logger.info(self.answers)
 
     def _possible_task(self,
-                       possible_operators: Dict[int, str]) -> Tuple[int, Task]:
+                       possible_operators: List[str]) -> Tuple[int, Task]:
         """
         returns an unhandled task and its id.
         also resets tasks with hold times above the defined ones.
         """
         for operator, tasks in self.tasks_table.items():
+            self.logger.debug(tasks)
             if operator not in possible_operators or len(tasks) == 0:
                 # has no tastks with the operator or
                 # all the tasks with the operator are done
                 next
 
-            for id, task in tasks:
+            for id, task in tasks.items():
                 if task.time_of_hold:
                     now = datetime.datetime.now()
-                    out_of_date = (now - task.time_of_hold) >= self.operators[operator]['min time']  # noqa
+                    delta = (now - task.time_of_hold).total_seconds()
+                    out_of_date = delta >= self.operators[operator]['min time']
 
                     # the selected task has been on hold for too long
                     if out_of_date:
@@ -98,70 +102,85 @@ class Calculations_Server:
                 else:
                     return (id, task)
 
-            return (None, None)
+        return (None, None)
 
     def _handle_client(self, client: socket.socket) -> None:
+        self.logger.debug(self.client_cache)
+
         connection_msg: Dict[str, int] = json.loads(client.recv(1024).decode())
+        self.logger.debug(f'connection message: {connection_msg}')
+        client_ip = client.getpeername()[0]
 
         match connection_msg['header']:
-            case Packet_Headers.INIT:
+            case Packet_Headers.INIT.value:
                 self.logger.debug("init packet")
 
                 # adding the client to the client "cache"
-                client_ip = client.getpeername()[0]
                 self.client_cache[client_ip] = connection_msg['operators']
 
-                task_id, task = self._possible_task()
+                task_id, task = self._possible_task(connection_msg['operators'])
 
                 if task:
                     packet = {
-                        'header': Packet_Headers.TASK,
+                        'header': Packet_Headers.TASK.value,
                         'id': task_id,
                         'operator': task.operator,
                         'parameter': task.parameter
                     }
 
-                    self.tasks_table[operator][task_id].time_of_hold = datetime.datetime.now()  # noqa
+                    self.tasks_table[task.operator][task_id].time_of_hold = datetime.datetime.now()  # noqa
 
                 else:
+                    self.logger.debug('client has no operators of use after INIT')
+                    self.logger.debug('sent END packet')
                     # as no task for the client
                     packet = {
-                        'header': Packet_Headers.END
+                        'header': Packet_Headers.END.value
                     }
 
-            case Packet_Headers.ANS:
+            case Packet_Headers.ANS.value:
                 self.logger.debug("ans packet")
+
+                ans_operator = connection_msg['operator']
+                answer = connection_msg['answer']
+                ans_id = connection_msg['task id']
                 self.answers.append(
-                    (connection_msg['operator'], connection_msg['answer'])
+                    (ans_operator, answer)
                 )
 
                 # got the answer for the task -> remove the task
-                self.tasks_table[operator].pop(connection_msg['task id'], None)
+                self.tasks_table[ans_operator].pop(ans_id, None)
 
-                task_id, task = self._possible_task()
+                # self.logger.debug(self._possible_task(self.client_cache[client_ip]))
+                # self.logger.debug(f"items: {self.tasks_table.items()}")
+
+                task_id, task = self._possible_task(self.client_cache[client_ip])
 
                 if task:
                     #  if there is another task avalible for the client
                     packet = {
-                        'header': Packet_Headers.TASK,
+                        'header': Packet_Headers.TASK.value,
                         'id': task_id,
                         'operator': task.operator,
                         'parameter': task.parameter
                     }
 
                     # renewing the hold
-                    self.tasks_table[operator][task_id].time_of_hold = datetime.datetime.now()  # noqa
+                    self.tasks_table[task.operator][task_id].time_of_hold = datetime.datetime.now()  # noqa
 
                 else:
+                    self.logger.debug("client has no operators of use")
                     self.logger.debug("sent end packet")
                     # client has no more tasks avalible
                     packet = {
-                        'header': Packet_Headers.END
+                        'header': Packet_Headers.END.value
                     }
 
         # sends the packet and closes the connection
         client.send(json.dumps(packet).encode())
+        self.logger.debug(f'sent to client: {packet}')
         client.close()
+        self.logger.debug("closed client")
 
 
 def main():
@@ -186,12 +205,10 @@ def main():
         datefmt='%d-%m-%Y %H:%M:%S',
     )
 
-    logging.getLogger('root').addHandler(logging.StreamHandler(stdout))
     logging.getLogger('root').addHandler(logging.FileHandler('exercise_log.log'))  # noqa
 
     server = Calculations_Server("127.0.0.1", 16166,
-                                 "C:\\Users\\User\\Desktop\\cyber\\12th-grade-cyber\\calculations server client\\tasks.txt"
-    )
+                                 "tasks.txt")
     server.run()
 
 
