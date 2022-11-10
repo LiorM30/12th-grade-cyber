@@ -59,7 +59,6 @@ def main():
         datefmt='%d-%m-%Y %H:%M:%S',
     )
 
-    logging.getLogger('root').addHandler(logging.StreamHandler(stdout))
     logging.getLogger('root').addHandler(logging.FileHandler('exercise_log.log'))  # noqa
 
     logger = logging.getLogger('root')
